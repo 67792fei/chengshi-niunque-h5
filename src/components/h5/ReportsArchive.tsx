@@ -27,7 +27,7 @@ import { ArchiveBatchDetails } from "./ArchiveBatchDetails";
 import { ArchiveRibbonBacking } from "./ArchiveRibbonBacking";
 import { H5_MOTION_ENABLED, h5MotionModules } from "./motion/motion-config";
 import { archiveFallbackSource, batchArtworkSource } from "./archive-batch-details";
-import { defaultLatestBatch, formatInspectionDate } from "@/config/h5-latest-batch";
+import { defaultLatestBatch, formatInspectionDate, regularBatchValues } from "@/config/h5-latest-batch";
 import { designAssets } from "@/config/design-assets.generated";
 import { pushHierarchyRoute } from "@/components/h5/hierarchy-navigation";
 
@@ -414,7 +414,7 @@ function ReportsArchiveReady({ modules, preview = false, config = defaultH5SiteC
       {/* Stationary backing and transparent original parts share one canvas;
           character and cue animation never moves an opaque page crop. */}
       <ArchiveArtwork preview={preview} mountDeferred={preview || deferredMounted} mountDeepDeferred={preview || deepDeferredMounted} paperMotionReady={artworkComplete && !guideEntry} ribbonMotionReady={readinessReady && !fallbackImageMounted && (!guideEntry || ribbonStartedAt !== undefined)} ribbonStartedAt={ribbonStartedAt} latestBatch={config.latestBatch} />
-      <p className="sr-only">适用批次号：正装 {config.latestBatch.regularBatch}，试用装 {config.latestBatch.trialBatch}；检测日期：{formatInspectionDate(config.latestBatch.inspectionDate)}</p>
+      <p className="sr-only">适用批次号：正装 {regularBatchValues(config.latestBatch).join("、")}，试用装 {config.latestBatch.trialBatch}；检测日期：{formatInspectionDate(config.latestBatch.inspectionDate)}</p>
       {(preview || deferredMounted) && <ArchiveFishFloatMotion preview={preview} />}
       {(preview || deferredMounted) && <ArchiveStoryCopyMotion preview={preview} />}
       {(preview || deferredMounted) && <ArchiveSectionTitleMotion preview={preview} activeSlug={pressedSlug} />}

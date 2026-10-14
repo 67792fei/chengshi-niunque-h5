@@ -2,13 +2,19 @@ import { defaultLatestBatch, formatInspectionDate, isDefaultLatestBatch, type La
 import { designAssets } from "@/config/design-assets.generated";
 
 export function batchArtworkSource(src: string, value: LatestBatch = defaultLatestBatch) {
-  return isDefaultLatestBatch(value) ? src : designAssets.archiveBatchEditable;
+  return value.regularBatchSecond ? designAssets.archiveBatchExpanded.src : isDefaultLatestBatch(value) ? src : designAssets.archiveBatchEditable;
 }
 export function archiveFallbackSource(value: LatestBatch) {
-  return isDefaultLatestBatch(value) ? designAssets.archiveFallback : designAssets.archiveFallbackEditable;
+  return value.regularBatchSecond ? designAssets.archiveFallbackExpanded : isDefaultLatestBatch(value) ? designAssets.archiveFallback : designAssets.archiveFallbackEditable;
 }
 export function batchValueFields(value: LatestBatch) {
   const date = formatInspectionDate(value.inspectionDate);
+  if (value.regularBatchSecond) return [
+    { key: "regularBatch", text: value.regularBatch, x: 272, y: 2842, width: Math.min(363, value.regularBatch.length * 30.8) },
+    { key: "regularBatchSecond", text: value.regularBatchSecond, x: 272, y: 2906, width: Math.min(363, value.regularBatchSecond.length * 30.8) },
+    { key: "trialBatch", text: value.trialBatch, x: 330, y: 2970, width: Math.min(307, value.trialBatch.length * 30.5) },
+    { key: "inspectionDate", text: date, x: 746, y: 2842, width: Math.min(310, 245 + (date.length - 7) * 28) },
+  ];
   return [
     { key: "regularBatch", text: value.regularBatch, x: 272, y: 2906, width: Math.min(363, value.regularBatch.length * 30.8) },
     { key: "trialBatch", text: value.trialBatch, x: 330, y: 2970, width: Math.min(307, value.trialBatch.length * 30.5) },

@@ -180,7 +180,12 @@ def version_archive_one(config, manifest):
         return
     for item in [*config["archiveBook"], *config["archiveBatch"]]:
         item["src"] = item["src"].split("?", 1)[0] + f"?v={revision}"
-    for key in ["archiveBatchEditable", "archiveFallback", "archiveFallbackEditable"]:
+    if "archiveBatchExpanded" in config:
+        item = config["archiveBatchExpanded"]
+        item["src"] = item["src"].split("?", 1)[0] + f"?v={revision}"
+    for key in ["archiveBatchEditable", "archiveFallback", "archiveFallbackEditable", "archiveFallbackExpanded"]:
+        if key not in config:
+            continue
         config[key] = config[key].split("?", 1)[0] + f"?v={revision}"
 
 
@@ -287,6 +292,54 @@ def build_editable_batch(config):
     config["archiveFallbackEditable"]="/design/2026-09-07/runtime/archive-reference-editable.webp"
 
 
+def build_expanded_batch(config, manifest):
+    """Leave the result card fixed while adding a second regular-batch row above it."""
+    from PIL import ImageDraw
+
+    part = config["archiveBatch"][0]
+    source = rgba(runtime_path(config["archiveBatchEditable"]))
+    source = source.resize((part["width"], part["height"]), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (2000, 3733))
+    canvas.alpha_composite(source, (part["x"], part["y"]))
+    # The original title, labels and digits are one raster group. The clean
+    # book beneath this transparent area supplies the existing yellow texture.
+    ImageDraw.Draw(canvas).rectangle((0, 2580, 1100, 3050), fill=(0, 0, 0, 0))
+    parts = manifest["groups"]["archive-1"]["parts"]
+
+    def source_part(number):
+        placement = parts[f"资源 {number}"]
+        image = rgba(SOURCES / placement["source"])
+        return image.resize((placement["width"], placement["height"]), Image.Resampling.LANCZOS)
+
+    # Keep the approved lettering, bullets and labels. Only their positions
+    # change; the three values and date are drawn by the shared SVG overlay.
+    for number, x, y in [(6, 59, 2528), (7, 100, 2782), (8, 711, 2782),
+                         (9, 745, 2762), (10, 135, 2762)]:
+        canvas.alpha_composite(source_part(number), (x, y))
+    batch_labels = source_part(12)
+    canvas.alpha_composite(batch_labels.crop((0, 0, 135, 65)), (135, 2840))
+    canvas.alpha_composite(batch_labels.crop((0, 65, 190, 130)), (135, 2968))
+
+    box = (0, 2530, part["x"] + part["width"], part["y"] + part["height"])
+    expanded = canvas.crop(box)
+    expanded.resize((1000, round(expanded.height * 1000 / expanded.width)), Image.Resampling.LANCZOS).save(
+        OUTPUT / "runtime/archive-batch-expanded.webp", "WEBP", lossless=True, method=6, exact=True)
+    config["archiveBatchExpanded"] = {
+        "src": "/design/2026-09-07/runtime/archive-batch-expanded.webp",
+        "x": box[0], "y": box[1], "width": box[2] - box[0], "height": box[3] - box[1],
+    }
+
+    fallback = rgba(runtime_path(config["archiveFallbackEditable"]))
+    book = rgba(runtime_path(config["archiveBook"][0]["src"]))
+    scale = fallback.width / config["archiveWidth"]
+    clear_box = (0, round(2530 * scale), round(1100 * scale), round(3050 * scale))
+    fallback.paste(book.crop(clear_box), clear_box[:2])
+    scaled = expanded.resize((round(expanded.width * scale), round(expanded.height * scale)), Image.Resampling.LANCZOS)
+    fallback.alpha_composite(scaled, (0, round(box[1] * scale)))
+    fallback.save(OUTPUT / "runtime/archive-reference-expanded.webp", "WEBP", quality=92, method=6, exact=True)
+    config["archiveFallbackExpanded"] = "/design/2026-09-07/runtime/archive-reference-expanded.webp"
+
+
 def build_archive_module_one(config, manifest):
     """Replace module one only; retain the later fallback artwork and layout."""
     previous_editable = rgba(runtime_path(config["archiveFallbackEditable"]))
@@ -298,6 +351,7 @@ def build_archive_module_one(config, manifest):
     fallback.paste(first_module, (0, 0))
     fallback.save(runtime_path(config["archiveFallback"]), "WEBP", quality=92, method=6, exact=True)
     build_editable_batch(config)
+    build_expanded_batch(config, manifest)
     editable = rgba(runtime_path(config["archiveFallbackEditable"]))
     editable.paste(previous_editable.crop((0, height, editable.width, editable.height)), (0, height))
     editable.save(runtime_path(config["archiveFallbackEditable"]), "WEBP", quality=92, method=6, exact=True)
@@ -504,6 +558,7 @@ def build():
     for im,y in [(a1,0),(full,3733),(a3,7974)]:complete.alpha_composite(im,(0,y))
     config["archiveFallback"]=save(complete,"archive-reference",1000)
     build_editable_batch(config)
+    build_expanded_batch(config,manifest)
     module2_specs=[(3,"heading",None),(28,"inspection-paper",None),(26,"inspection-folder","inspection-projects"),(29,"inspection-mascot",None),(25,"review-folder","review-assurance"),(27,"production-paper",None),(24,"production-folder","production-traceability"),(23,"instructions",None)]
     config["archiveModule2"]=[{"id":f"module-2-{name}","slug":slug,**save_part("archive-2",n,offset=3733)} for n,name,slug in module2_specs]
     # Hit regions follow the visible original alpha contours, including the
@@ -543,10 +598,11 @@ if __name__ == "__main__":
     parser.add_argument("--review-card-copy", action="store_true")
     parser.add_argument("--category-tails", action="store_true")
     parser.add_argument("--editable-batch", action="store_true")
+    parser.add_argument("--expanded-batch", action="store_true")
     parser.add_argument("--loading-motion", action="store_true")
     args = parser.parse_args()
     if args.build: build()
-    elif args.fish_motion or args.archive_entry or args.archive_module_one or args.review_card_copy or args.category_tails or args.editable_batch or args.loading_motion:
+    elif args.fish_motion or args.archive_entry or args.archive_module_one or args.review_card_copy or args.category_tails or args.editable_batch or args.expanded_batch or args.loading_motion:
         target=ROOT/"src/config/design-assets.generated.ts"
         prefix="// Generated by scripts/refresh-design-assets.py --build. Do not hand edit.\nexport const designAssets = "
         config=json.loads(target.read_text(encoding="utf-8").split("export const designAssets = ",1)[1].removesuffix(" as const;\n"))
@@ -555,7 +611,8 @@ if __name__ == "__main__":
         elif args.review_card_copy: build_review_card_copy(config,manifest)
         elif args.archive_module_one: build_archive_module_one(config,manifest)
         elif args.archive_entry: build_archive_entry(config,json.loads((OUTPUT/"manifest.json").read_text(encoding="utf-8")))
-        elif args.editable_batch: build_editable_batch(config)
+        elif args.editable_batch: build_editable_batch(config); build_expanded_batch(config, manifest)
+        elif args.expanded_batch: build_expanded_batch(config, manifest)
         elif args.loading_motion: build_loading_motion(config)
         else: build_category_tails(config,json.loads((OUTPUT/"manifest.json").read_text(encoding="utf-8")))
         version_archive_one(config,manifest)
