@@ -54,6 +54,9 @@ describe("editable latest public batch", () => {
       expect(root.querySelector('[data-batch-field="regularBatch"]')).toHaveTextContent(dual.regularBatch);
       expect(root.querySelector('[data-batch-field="regularBatchSecond"]')).toHaveTextContent(dual.regularBatchSecond);
       expect(root.querySelector('[data-batch-field="trialBatch"]')).toHaveTextContent(dual.trialBatch);
+      for (const key of ["regularBatch", "regularBatchSecond", "trialBatch"]) {
+        expect(root.querySelector(`[data-batch-field="${key}"]`)).toHaveAttribute("x", "330");
+      }
     }
   });
 });

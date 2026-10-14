@@ -9237,11 +9237,11 @@ export const designAssets = {
     "travel": 896
   },
   "archiveBatchExpanded": {
-    "src": "/design/2026-09-07/runtime/archive-batch-expanded.webp?v=20260908",
+    "src": "/design/2026-09-07/runtime/archive-batch-expanded.webp?v=787ade1d0a",
     "x": 0,
     "y": 2530,
     "width": 1631,
     "height": 1072
   },
-  "archiveFallbackExpanded": "/design/2026-09-07/runtime/archive-reference-expanded.webp?v=20260908"
+  "archiveFallbackExpanded": "/design/2026-09-07/runtime/archive-reference-expanded.webp?v=b027f6b41e"
 } as const;

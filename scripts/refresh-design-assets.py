@@ -182,11 +182,15 @@ def version_archive_one(config, manifest):
         item["src"] = item["src"].split("?", 1)[0] + f"?v={revision}"
     if "archiveBatchExpanded" in config:
         item = config["archiveBatchExpanded"]
-        item["src"] = item["src"].split("?", 1)[0] + f"?v={revision}"
+        path = item["src"].split("?", 1)[0]
+        digest = hashlib.sha256(runtime_path(path).read_bytes()).hexdigest()[:10]
+        item["src"] = f"{path}?v={digest}"
     for key in ["archiveBatchEditable", "archiveFallback", "archiveFallbackEditable", "archiveFallbackExpanded"]:
         if key not in config:
             continue
-        config[key] = config[key].split("?", 1)[0] + f"?v={revision}"
+        path = config[key].split("?", 1)[0]
+        version = hashlib.sha256(runtime_path(path).read_bytes()).hexdigest()[:10] if key == "archiveFallbackExpanded" else revision
+        config[key] = f"{path}?v={version}"
 
 
 def build_archive_entry(config, manifest):
@@ -317,7 +321,10 @@ def build_expanded_batch(config, manifest):
                          (9, 745, 2762), (10, 135, 2762)]:
         canvas.alpha_composite(source_part(number), (x, y))
     batch_labels = source_part(12)
-    canvas.alpha_composite(batch_labels.crop((0, 0, 135, 65)), (135, 2840))
+    # "正  装：" spans the same width as "试用装：": left edges and colons align.
+    canvas.alpha_composite(batch_labels.crop((0, 0, 55, 65)), (135, 2840))
+    canvas.alpha_composite(batch_labels.crop((55, 0, 112, 65)), (243, 2840))
+    canvas.alpha_composite(batch_labels.crop((112, 0, 135, 65)), (301, 2840))
     canvas.alpha_composite(batch_labels.crop((0, 65, 190, 130)), (135, 2968))
 
     box = (0, 2530, part["x"] + part["width"], part["y"] + part["height"])
