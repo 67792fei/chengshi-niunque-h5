@@ -1,5 +1,6 @@
 import { DEFAULT_H5_CONTENT } from "@/config/default-h5-content";
 import { resolveCategoryCardCopy, resolveCategoryReportTitle } from "@/config/h5-card-copy";
+import { previousProductionQualificationDescription, productionQualificationDescription } from "@/config/h5-production-qualification";
 
 describe("approved category card copy", () => {
   it("keeps nutrition and freshness descriptions with their card IDs when reordered", () => {
@@ -33,6 +34,15 @@ describe("approved category card copy", () => {
     expect(resolveCategoryCardCopy("review-assurance", custom, 1)).toMatchObject({ title: custom.title, description: custom.description });
     const unknown = { ...custom, id: "managed-custom", description: "复核采用的质量标准与记录。" };
     expect(resolveCategoryCardCopy("review-assurance", unknown, 0).description).toBe(unknown.description);
+  });
+
+  it("updates the published production qualification copy without overwriting custom copy", () => {
+    const original = DEFAULT_H5_CONTENT[2].cards[0];
+    const legacy = { ...original, description: previousProductionQualificationDescription, assets: [] };
+    expect(resolveCategoryCardCopy("production-traceability", legacy).description).toBe(productionQualificationDescription);
+    expect(resolveCategoryCardCopy("production-traceability", { ...legacy, id: "existing-production-card" }).description).toBe(productionQualificationDescription);
+    expect(resolveCategoryCardCopy("production-traceability", { ...legacy, description: "后台自定义资质说明" }).description).toBe("后台自定义资质说明");
+    expect(resolveCategoryCardCopy("production-traceability", { ...legacy, id: "other-card", title: "经营资质" }).description).toBe(previousProductionQualificationDescription);
   });
 
   it("refreshes the previous third review card copy by identity without changing report bindings", () => {

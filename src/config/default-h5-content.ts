@@ -1,3 +1,5 @@
+import { productionQualificationDescription } from "@/config/h5-production-qualification";
+
 export const FORMAL_H5_CATEGORY_SLUGS = [
   "inspection-projects",
   "review-assurance",
@@ -38,7 +40,7 @@ export const DEFAULT_H5_CONTENT = [
     description: "查看生产资质与经营资质资料。",
     sortOrder: 30,
     cards: [
-      { id: "seed-card-traceability-qualification", title: "生产资质", description: "确认生产方具备对应产品的生产许可、资质文件和基础生产条件", sortOrder: 10 },
+      { id: "seed-card-traceability-qualification", title: "生产资质", description: productionQualificationDescription, sortOrder: 10 },
       { id: "seed-card-traceability-quality", title: "经营资质", description: "", sortOrder: 20, legacyTitle: "质量管理" },
     ],
   },

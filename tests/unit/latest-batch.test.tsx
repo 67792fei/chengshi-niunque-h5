@@ -18,7 +18,7 @@ describe("editable latest public batch", () => {
   it("validates all fields before publishing and never accepts arbitrary homepage fields", () => {
     expect(validateLatestBatch({ ...edited, regularBatch: " GD00049001 ", archiveTitle: "changed" })).toEqual(edited);
     for (const regularBatch of ["", "A".repeat(25), "<img>", "batch with spaces"]) expect(() => validateLatestBatch({ ...edited, regularBatch })).toThrow(/正装批次号/);
-    expect(() => validateLatestBatch({ ...edited, trialBatch: "" })).toThrow(/试用装批次号/);
+    expect(() => validateLatestBatch({ ...edited, trialBatch: "" })).toThrow(/便携装批次号/);
     expect(() => validateLatestBatch({ ...edited, inspectionDate: "2026-02-30" })).toThrow(/检测日期/);
     expect(resolveLatestBatch(null)).toEqual(defaultLatestBatch);
     const dual = { ...edited, regularBatch: "GD00046087", regularBatchSecond: "GD00046763" };

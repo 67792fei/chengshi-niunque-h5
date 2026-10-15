@@ -1,5 +1,6 @@
 import { DEFAULT_H5_CONTENT } from "@/config/default-h5-content";
 import { getCategoryTheme } from "@/config/h5-category-themes";
+import { previousProductionQualificationDescription, productionQualificationDescription } from "@/config/h5-production-qualification";
 
 type CardCopy = { id: string; title: string; description: string | null; assets: readonly unknown[] };
 const legacyDescriptions = new Set([
@@ -26,15 +27,21 @@ export function resolveCategoryCardCopy(slug: string, card: CardCopy | null, slo
   const index = identityIndex >= 0 ? identityIndex : slotIndex;
   const fallback = theme.artworkLayers && index !== undefined ? theme.cardFallbacks[index] : undefined;
   const description = card?.description?.trim() ?? "";
+  const previousQualificationCopy = slug === "production-traceability"
+    && card?.title.trim() === "生产资质"
+    && description === previousProductionQualificationDescription;
   const placeholderTitle = !card || /^第\d+项资料$/.test(card.title.trim())
     || (identityIndex >= 0 && fallback?.legacyTitles.includes(card.title));
   const placeholderDescription = !description || description === "资料整理中，正式发布后可在此查看。"
     || (identityIndex >= 0 && legacyDescriptions.has(description))
+    || previousQualificationCopy
     || (slug === "review-assurance" && card?.id === "seed-card-review-stability-sensory"
       && description === "工厂出厂检测和第三方检测，双层兜底检测");
   return {
     title: fallback && placeholderTitle ? fallback.title : card?.title ?? fallback?.title ?? "报告资料",
-    description: fallback && placeholderDescription ? fallback.description : description,
+    description: previousQualificationCopy
+      ? productionQualificationDescription
+      : fallback && placeholderDescription ? fallback.description : description,
     buttonText: card?.assets.length ? `查看${card.assets.length}份报告` : card ? "暂无报告" : fallback?.buttonText ?? "查看报告",
   };
 }

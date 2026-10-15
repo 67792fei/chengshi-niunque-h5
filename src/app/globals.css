@@ -1064,7 +1064,11 @@ html[data-guide-route-entry] .reports-archive-final .reports-archive-entry-batch
   max-width: 74cqw;
   margin-top: 1.05cqw;
   font-size: 3cqw;
+  font-weight: 400;
   line-height: 1.36;
+}
+.category-page-final[data-category="production-traceability"] .category-card-hotspot[data-expanded-qualification="true"] [data-card-part="control-3"] {
+  transform: translateY(4cqw);
 }
 
 /* 3. “查看X份报告”：与其它页统一的药丸文字比例 */

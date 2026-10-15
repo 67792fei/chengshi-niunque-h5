@@ -178,8 +178,11 @@ def version_archive_one(config, manifest):
     revision = manifest["groups"]["archive-1"].get("revision")
     if not revision:
         return
-    for item in [*config["archiveBook"], *config["archiveBatch"]]:
+    for item in config["archiveBook"]:
         item["src"] = item["src"].split("?", 1)[0] + f"?v={revision}"
+    for item in config["archiveBatch"]:
+        path = item["src"].split("?", 1)[0]
+        item["src"] = f"{path}?v={hashlib.sha256(runtime_path(path).read_bytes()).hexdigest()[:10]}"
     if "archiveBatchExpanded" in config:
         item = config["archiveBatchExpanded"]
         path = item["src"].split("?", 1)[0]
@@ -189,7 +192,7 @@ def version_archive_one(config, manifest):
         if key not in config:
             continue
         path = config[key].split("?", 1)[0]
-        version = hashlib.sha256(runtime_path(path).read_bytes()).hexdigest()[:10] if key == "archiveFallbackExpanded" else revision
+        version = hashlib.sha256(runtime_path(path).read_bytes()).hexdigest()[:10]
         config[key] = f"{path}?v={version}"
 
 
@@ -296,9 +299,66 @@ def build_editable_batch(config):
     config["archiveFallbackEditable"]="/design/2026-09-07/runtime/archive-reference-editable.webp"
 
 
+def portable_batch_label():
+    """Typeset the new visible label at the source artwork's size and color."""
+    from PIL import ImageDraw, ImageFont
+
+    font_paths = [Path("C:/Windows/Fonts/NotoSansSC-VF.ttf"),
+                  Path("/usr/share/fonts/truetype/noto/NotoSansSC-VF.ttf")]
+    font_path = next((path for path in font_paths if path.exists()), None)
+    if font_path is None:
+        raise FileNotFoundError("Noto Sans SC is required to rebuild the batch label")
+    font = ImageFont.truetype(str(font_path), 55)
+    font.set_variation_by_name("Regular")
+    artwork = Image.new("RGBA", (190, 65))
+    ImageDraw.Draw(artwork).text((4, 2), "便携装", font=font,
+                                fill=(102, 63, 29, 255), anchor="lt")
+    original = rgba(SOURCES / "2-长图模块1/长图模块一，部件/资源 12.png")
+    artwork.alpha_composite(original.crop((166, 65, 190, 130)), (166, 0))
+    return artwork
+
+
+def build_portable_batch_label(config):
+    """Replace the raster label in both layered and full-image variants."""
+    from PIL import ImageDraw
+
+    label = portable_batch_label()
+    part = config["archiveBatch"][0]
+    clear_box = (130, 2968, 325, 3033)
+    for key in ["archiveBatch", "archiveBatchEditable"]:
+        path = part["src"] if key == "archiveBatch" else config[key]
+        image = rgba(runtime_path(path))
+        sx, sy = image.width / part["width"], image.height / part["height"]
+        region = tuple(round(value * scale) for value, scale in zip(
+            (clear_box[0] - part["x"], clear_box[1] - part["y"],
+             clear_box[2] - part["x"], clear_box[3] - part["y"]),
+            (sx, sy, sx, sy)))
+        alpha = image.getchannel("A")
+        ImageDraw.Draw(alpha).rectangle(region, fill=0)
+        image.putalpha(alpha)
+        image.alpha_composite(label.resize((round(190 * sx), round(65 * sy)), Image.Resampling.LANCZOS),
+                              (round((135 - part["x"]) * sx), round((2968 - part["y"]) * sy)))
+        if key == "archiveBatch":
+            image.save(runtime_path(path), "WEBP", quality=92, method=6, exact=True)
+        else:
+            image.save(runtime_path(path), "WEBP", lossless=True, method=6, exact=True)
+
+    book = rgba(runtime_path(config["archiveBook"][0]["src"]))
+    for key in ["archiveFallback", "archiveFallbackEditable"]:
+        path = config[key]
+        fallback = rgba(runtime_path(path))
+        scale = fallback.width / config["archiveWidth"]
+        underlay = book.resize((fallback.width, round(3733 * scale)), Image.Resampling.LANCZOS)
+        box = tuple(round(value * scale) for value in clear_box)
+        fallback.paste(underlay.crop(box), box[:2])
+        fallback.alpha_composite(label.resize((round(190 * scale), round(65 * scale)), Image.Resampling.LANCZOS),
+                                 (round(135 * scale), round(2968 * scale)))
+        fallback.save(runtime_path(path), "WEBP", quality=92, method=6, exact=True)
+
+
 def build_expanded_batch(config, manifest):
     """Leave the result card fixed while adding a second regular-batch row above it."""
-    from PIL import ImageDraw
+    from PIL import ImageDraw, ImageFont
 
     part = config["archiveBatch"][0]
     source = rgba(runtime_path(config["archiveBatchEditable"]))
@@ -321,11 +381,32 @@ def build_expanded_batch(config, manifest):
                          (9, 745, 2762), (10, 135, 2762)]:
         canvas.alpha_composite(source_part(number), (x, y))
     batch_labels = source_part(12)
-    # "正  装：" spans the same width as "试用装：": left edges and colons align.
+    # The two batch labels span the same width: left edges and colons align.
     canvas.alpha_composite(batch_labels.crop((0, 0, 55, 65)), (135, 2840))
     canvas.alpha_composite(batch_labels.crop((55, 0, 112, 65)), (243, 2840))
     canvas.alpha_composite(batch_labels.crop((112, 0, 135, 65)), (301, 2840))
-    canvas.alpha_composite(batch_labels.crop((0, 65, 190, 130)), (135, 2968))
+    canvas.alpha_composite(portable_batch_label(), (135, 2968))
+
+    # The original footer sentence is baked into the supplied full image.
+    # Restore just its paper strip from the separate blank card component,
+    # then typeset the three-batch statement without touching the result rows.
+    card_placement = parts["资源 5"]
+    card = source_part(5)
+    footer_box = (94, 3475, 1535, 3546)
+    card_x, card_y = card_placement["x"], card_placement["y"]
+    card_strip = card.crop((footer_box[0] - card_x, footer_box[1] - card_y,
+                            footer_box[2] - card_x, footer_box[3] - card_y))
+    canvas.alpha_composite(card_strip, footer_box[:2])
+    footer_copy = "以上三个批次内容物为同配方、同批原料、同一产线生产，共用同一份内容物检测报告。"
+    font_paths = [Path("C:/Windows/Fonts/NotoSansSC-VF.ttf"),
+                  Path("/usr/share/fonts/truetype/noto/NotoSansSC-VF.ttf")]
+    font_path = next((path for path in font_paths if path.exists()), None)
+    if font_path is None:
+        raise FileNotFoundError("Noto Sans SC is required to rebuild the expanded batch footer")
+    font = ImageFont.truetype(str(font_path), 37)
+    font.set_variation_by_name("Regular")
+    ImageDraw.Draw(canvas).text((105, 3488), footer_copy, font=font,
+                                fill=(105, 78, 53, 255), anchor="lt")
 
     box = (0, 2530, part["x"] + part["width"], part["y"] + part["height"])
     expanded = canvas.crop(box)
@@ -358,6 +439,7 @@ def build_archive_module_one(config, manifest):
     fallback.paste(first_module, (0, 0))
     fallback.save(runtime_path(config["archiveFallback"]), "WEBP", quality=92, method=6, exact=True)
     build_editable_batch(config)
+    build_portable_batch_label(config)
     build_expanded_batch(config, manifest)
     editable = rgba(runtime_path(config["archiveFallbackEditable"]))
     editable.paste(previous_editable.crop((0, height, editable.width, editable.height)), (0, height))
@@ -587,6 +669,7 @@ def build():
     for im,y in [(a1,0),(full,3733),(a3,7974)]:complete.alpha_composite(im,(0,y))
     config["archiveFallback"]=save(complete,"archive-reference",1000)
     build_editable_batch(config)
+    build_portable_batch_label(config)
     build_expanded_batch(config,manifest)
     module2_specs=[(3,"heading",None),(28,"inspection-paper",None),(26,"inspection-folder","inspection-projects"),(29,"inspection-mascot",None),(25,"review-folder","review-assurance"),(27,"production-paper",None),(24,"production-folder","production-traceability"),(23,"instructions",None)]
     config["archiveModule2"]=[{"id":f"module-2-{name}","slug":slug,**save_part("archive-2",n,offset=3733)} for n,name,slug in module2_specs]
@@ -642,9 +725,13 @@ if __name__ == "__main__":
         if args.fish_motion: build_fish_motion(config)
         elif args.review_card_copy: build_review_card_copy(config,manifest)
         elif args.archive_module_one: build_archive_module_one(config,manifest)
-        elif args.archive_entry: build_archive_entry(config,json.loads((OUTPUT/"manifest.json").read_text(encoding="utf-8")))
-        elif args.editable_batch: build_editable_batch(config); build_expanded_batch(config, manifest)
-        elif args.expanded_batch: build_expanded_batch(config, manifest)
+        elif args.archive_entry:
+            build_archive_entry(config, manifest)
+            build_editable_batch(config)
+            build_portable_batch_label(config)
+            build_expanded_batch(config, manifest)
+        elif args.editable_batch: build_editable_batch(config); build_portable_batch_label(config); build_expanded_batch(config, manifest)
+        elif args.expanded_batch: build_portable_batch_label(config); build_expanded_batch(config, manifest)
         elif args.loading_motion: build_loading_motion(config)
         else: build_category_tails(config,json.loads((OUTPUT/"manifest.json").read_text(encoding="utf-8")))
         version_archive_one(config,manifest)
