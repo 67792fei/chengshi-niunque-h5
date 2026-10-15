@@ -399,8 +399,9 @@ html[data-category-loading-feedback] .guide-loading-buffer.is-persistent .guide-
 .brand-guide-stage img { display: block; max-width: none; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .brand-guide-window-mask { position: absolute; z-index: 25; inset: 0; display: block; width: 100%; height: 100%; max-width: none; object-fit: fill; object-position: center; transform: translate3d(0,0,0); backface-visibility: hidden; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .brand-guide-dynamic-stage { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; opacity: 1; }
-.brand-guide-arch, .brand-guide-paper, .brand-guide-character, .brand-guide-foreground-top, .brand-guide-fallback { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; object-position: center; transform: translate3d(0,0,0); backface-visibility: hidden; }
+.brand-guide-arch, .brand-guide-arm-right, .brand-guide-paper, .brand-guide-character, .brand-guide-foreground-top, .brand-guide-fallback { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; object-position: center; transform: translate3d(0,0,0); backface-visibility: hidden; }
 .brand-guide-arch { z-index: 27; visibility: visible; opacity: 1; pointer-events: none; }
+.brand-guide-arm-right { z-index: 33; }
 .brand-guide-paper { z-index: 34; animation-duration: var(--guide-paper-duration), 300ms; animation-timing-function: cubic-bezier(.2,.72,.3,1.04), ease-out; animation-delay: calc(var(--guide-paper-start) + var(--paper-offset, 0ms)), calc(var(--guide-paper-start) + var(--paper-offset, 0ms)); animation-fill-mode: both, both; transform-origin: center; backface-visibility: hidden; }
 .brand-guide-paper-top { --paper-offset: 0ms; animation-name: guide-paper-from-top, guide-paper-fade; }
 .brand-guide-paper-left { --paper-offset: 80ms; animation-name: guide-paper-from-left, guide-paper-fade; }

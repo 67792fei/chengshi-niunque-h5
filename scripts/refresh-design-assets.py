@@ -398,6 +398,56 @@ def build_category_tails(config, manifest):
         config["categories"][slug]["tail"]=f"/design/2026-09-07/runtime/{filename}"
 
 
+def build_guide_composition(manifest):
+    """Align the reusable guide paper and arm to the supplied 9.4 still."""
+    guide_parts=manifest["groups"]["guide"]["parts"]
+    def guide_item(n): return guide_parts[f"资源 {n}" if isinstance(n,int) else n]
+    oldguide=ROOT/"public/design/guide"
+    guide_out=OUTPUT/"guide";guide_out.mkdir(exist_ok=True)
+    guide_names=["guide-background","guide-character-open","guide-character-closed","guide-window-mask","guide-arch","report-paper-top","report-paper-left","report-paper-bottom"]
+    for name in guide_names: shutil.copyfile(oldguide/f"{name}.webp",guide_out/f"{name}.webp")
+
+    # The older right-hand paper is 90px too far inward and 57px too low on
+    # the 750x1625 canvas. These offsets register it to the approved 9.4 still.
+    right_paper=Image.new("RGBA",(750,1625))
+    right_paper.paste(rgba(oldguide/"report-paper-right.webp"),(90,-57))
+    right_paper.save(guide_out/"report-paper-right.webp","WEBP",lossless=True,method=6)
+
+    # Resource 9 is the original right arm. It belongs below the paper rather
+    # than in the upper foreground with the hat and label.
+    right_arm=Image.new("RGBA",(750,1625))
+    arm_source=rgba(SOURCES/guide_item(9)["source"])
+    right_arm.alpha_composite(arm_source.resize((round(arm_source.width*.375),round(arm_source.height*.375)),Image.Resampling.LANCZOS),(628,381))
+    right_arm.save(guide_out/"guide-arm-right.webp","WEBP",lossless=True,method=6)
+
+    old_foreground=np.asarray(rgba(oldguide/"guide-foreground-top.webp")).copy()
+    x=np.arange(750)[None,:]
+    dark=(old_foreground[:,:,:3]<150).all(axis=2)
+
+    fg=Image.new("RGBA",(750,1625))
+    def guide_place(im,x,y):fg.alpha_composite(im.resize((round(im.width*.375),round(im.height*.375)),Image.Resampling.LANCZOS),(x,y))
+    guide_place(rgba(SOURCES/guide_item("检测报告")["source"]),-49,508)
+    guide_place(rgba(SOURCES/guide_item(6)["source"]),136,116)
+    # Keep the hat and DHA over the moving paper; the right arm stays behind it.
+    arr=old_foreground.copy();keep=np.zeros(arr.shape[:2],dtype=bool)
+    keep[420:700,80:700]=True
+    yellow=(arr[:,:,0]>210)&(arr[:,:,1]>100)&(arr[:,:,1]<235)&(arr[:,:,2]<175)&(arr[:,:,0].astype(int)-arr[:,:,1].astype(int)>20)
+    keep &= (dark&(x<610))|yellow
+    arr[:,:,3]=np.where(keep,arr[:,:,3],0);fg.alpha_composite(Image.fromarray(arr))
+    for n,px,py in [(10,53,838),(11,229,947)]:guide_place(rgba(SOURCES/guide_item(n)["source"]),px,py)
+    fg.save(guide_out/"guide-foreground-top.webp","WEBP",lossless=True,method=6)
+    hint=rgba(SOURCES/guide_item("添加上下跳动的动效")["source"])
+    hint.save(guide_out/"swipe-up-hint-v2.png")
+    for mode in ["first-frame","static-foreground-v2"]:
+        canvas=rgba(guide_out/"guide-background.webp")
+        names=["guide-character-open","guide-window-mask","guide-arch","guide-arm-right"]
+        if mode=="static-foreground-v2":names += [f"report-paper-{side}" for side in ["top","left","right","bottom"]]
+        for name in names:canvas.alpha_composite(rgba(guide_out/f"{name}.webp"))
+        canvas.alpha_composite(fg)
+        if mode=="static-foreground-v2":canvas.alpha_composite(hint.resize((326,98),Image.Resampling.LANCZOS),(212,1473))
+        canvas.save(guide_out/f"guide-{mode}.webp","WEBP",quality=94,method=6)
+
+
 def build():
     import cv2
     manifest = json.loads((OUTPUT/"manifest.json").read_text(encoding="utf-8"))
@@ -483,35 +533,7 @@ def build():
         fish_clean.paste(clean3.crop(box),box[:2])
     config["fishPatch"]=cut_layer(fish_clean,(0,40,2000,270),"fish-clean",7974)
 
-    # New KV shares the exact pixels of the existing mascot, mask, logo and
-    # paper primitive. Retain their established poses and replace the envelope
-    # with the newly supplied report artwork on the same 750x1625 plane.
-    oldguide=ROOT/"public/design/guide"
-    guide_out=OUTPUT/"guide";guide_out.mkdir(exist_ok=True)
-    guide_names=["guide-background","guide-character-open","guide-character-closed","guide-window-mask","guide-arch","report-paper-top","report-paper-left","report-paper-right","report-paper-bottom"]
-    for name in guide_names: shutil.copyfile(oldguide/f"{name}.webp",guide_out/f"{name}.webp")
-    fg=Image.new("RGBA",(750,1625))
-    def guide_place(im,x,y):fg.alpha_composite(im.resize((round(im.width*.375),round(im.height*.375)),Image.Resampling.LANCZOS),(x,y))
-    guide_place(rgba(SOURCES/item("guide","检测报告")["source"]),-49,508)
-    guide_place(rgba(SOURCES/item("guide",6)["source"]),136,116)
-    # Hat and DHA must stay above the animated right paper.
-    promoted=rgba(oldguide/"guide-foreground-top.webp")
-    arr=np.asarray(promoted).copy(); keep=np.zeros(arr.shape[:2],dtype=bool)
-    keep[420:700,80:700]=True
-    keep &= ((arr[:,:,0]<125)&(arr[:,:,1]<125)&(arr[:,:,2]<125)) | ((arr[:,:,0]>210)&(arr[:,:,1]>100)&(arr[:,:,1]<235)&(arr[:,:,2]<175)&(arr[:,:,0].astype(int)-arr[:,:,1].astype(int)>20))
-    arr[:,:,3]=np.where(keep,arr[:,:,3],0);fg.alpha_composite(Image.fromarray(arr))
-    for n,x,y in [(9,628,381),(10,53,838),(11,229,947)]:guide_place(rgba(SOURCES/item("guide",n)["source"]),x,y)
-    fg.save(guide_out/"guide-foreground-top.webp","WEBP",lossless=True,method=6)
-    hint=rgba(SOURCES/item("guide","添加上下跳动的动效")["source"])
-    hint.save(guide_out/"swipe-up-hint-v2.png")
-    for mode in ["first-frame","static-foreground-v2"]:
-        canvas=rgba(guide_out/"guide-background.webp")
-        names=["guide-character-open","guide-window-mask","guide-arch"]
-        if mode=="static-foreground-v2":names += [f"report-paper-{side}" for side in ["top","left","right","bottom"]]
-        for name in names:canvas.alpha_composite(rgba(guide_out/f"{name}.webp"))
-        canvas.alpha_composite(fg)
-        if mode=="static-foreground-v2":canvas.alpha_composite(hint.resize((326,98),Image.Resampling.LANCZOS),(212,1473))
-        canvas.save(guide_out/f"guide-{mode}.webp","WEBP",quality=94,method=6)
+    build_guide_composition(manifest)
     save(ref("loading"),"loading-poster",750)
     build_loading_motion(config)
 
@@ -606,9 +628,12 @@ if __name__ == "__main__":
     parser.add_argument("--category-tails", action="store_true")
     parser.add_argument("--editable-batch", action="store_true")
     parser.add_argument("--expanded-batch", action="store_true")
+    parser.add_argument("--guide-composition", action="store_true")
     parser.add_argument("--loading-motion", action="store_true")
     args = parser.parse_args()
     if args.build: build()
+    elif args.guide_composition:
+        build_guide_composition(json.loads((OUTPUT/"manifest.json").read_text(encoding="utf-8")))
     elif args.fish_motion or args.archive_entry or args.archive_module_one or args.review_card_copy or args.category_tails or args.editable_batch or args.expanded_batch or args.loading_motion:
         target=ROOT/"src/config/design-assets.generated.ts"
         prefix="// Generated by scripts/refresh-design-assets.py --build. Do not hand edit.\nexport const designAssets = "

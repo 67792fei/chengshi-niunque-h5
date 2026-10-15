@@ -44,12 +44,13 @@ const clampProgress = (value: number) => Math.min(1, Math.max(0, value));
 const assetUrl = (name: string) => `/design/2026-09-07/guide/${name}`;
 const standardLayerNames = [
   "guide-character-open.webp", "guide-character-closed.webp", "guide-window-mask.webp", "guide-arch.webp",
+  "guide-arm-right.webp",
   "report-paper-top.webp", "report-paper-left.webp", "report-paper-right.webp", "report-paper-bottom.webp",
   "guide-foreground-top.webp",
 ] as const;
 const standardReadyKeys = [...standardLayerNames, "standard-hint"] as const;
 const landscapeReadyKeys = [
-  "landscape-logo", "landscape-character-arch", "landscape-character-open",
+  "landscape-logo", "landscape-character-arch", "landscape-character-open", "landscape-character-arm",
   "landscape-character-foreground", "landscape-envelope", "landscape-hint",
 ] as const;
 
@@ -77,6 +78,7 @@ function GuideLayers({ onReady, onError }: { onReady: (key: string) => void; onE
     {image("guide-character-closed.webp", "brand-guide-character brand-guide-character-closed")}
     {image("guide-window-mask.webp", "brand-guide-window-mask", true)}
     {image("guide-arch.webp", "brand-guide-arch", true)}
+    {image("guide-arm-right.webp", "brand-guide-arm-right", true)}
     {image("report-paper-top.webp", "brand-guide-paper brand-guide-paper-top", true)}
     {image("report-paper-left.webp", "brand-guide-paper brand-guide-paper-left", true)}
     {image("report-paper-right.webp", "brand-guide-paper brand-guide-paper-right", true)}
@@ -96,7 +98,7 @@ function GuideLandscapeCrop({ name, src, readyKey, onReady, onError }: { name: "
 }
 
 function GuideLandscapeCharacter({ onReady, onError }: { onReady: (key: string) => void; onError: (name: string) => void }) {
-  const layers = ["guide-arch.webp", "guide-character-open.webp", "guide-foreground-top.webp"] as const;
+  const layers = ["guide-arch.webp", "guide-character-open.webp", "guide-arm-right.webp", "guide-foreground-top.webp"] as const;
   return <div className="guide-landscape-crop guide-landscape-character" data-guide-landmark="character">
     {layers.map((name, index) => <Image
       key={name}
@@ -110,7 +112,7 @@ function GuideLandscapeCharacter({ onReady, onError }: { onReady: (key: string) 
       priority
       unoptimized
       decoding="async"
-      onLoad={(event) => markImageDecoded(event.currentTarget, ["landscape-character-arch", "landscape-character-open", "landscape-character-foreground"][index]!, onReady, onError)}
+      onLoad={(event) => markImageDecoded(event.currentTarget, ["landscape-character-arch", "landscape-character-open", "landscape-character-arm", "landscape-character-foreground"][index]!, onReady, onError)}
       onError={() => onError(name)}
     />)}
   </div>;

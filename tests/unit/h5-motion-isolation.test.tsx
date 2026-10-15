@@ -120,7 +120,7 @@ describe("H5 motion isolation", () => {
     expect(750 / 1625).toBeCloseTo(6 / 13, 10);
     expect(layout).toMatch(/import "\.\/globals\.css";\s*import "\.\/guide-adaptation\.vw\.css";/);
     expect(css).not.toContain(".brand-guide-portrait-scene.is-compact-fallback");
-    expect(css).toMatch(/\.brand-guide-arch,\s*\.brand-guide-paper,\s*\.brand-guide-character,\s*\.brand-guide-foreground-top,\s*\.brand-guide-fallback\s*\{[^}]*object-fit:\s*fill;[^}]*object-position:\s*center;/);
+    expect(css).toMatch(/\.brand-guide-arch,\s*\.brand-guide-arm-right,\s*\.brand-guide-paper,\s*\.brand-guide-character,\s*\.brand-guide-foreground-top,\s*\.brand-guide-fallback\s*\{[^}]*object-fit:\s*fill;[^}]*object-position:\s*center;/);
     expect(css).not.toContain(".guide-compact-portrait-composition");
     expect(css).toContain(".guide-landscape-composition { position: absolute; inset: 0; display: block;");
     expect(css).toContain(".guide-landscape-logo");
@@ -137,6 +137,7 @@ describe("H5 motion isolation", () => {
     expect(css).toMatch(/\.brand-guide\s*\{[^}]*width:\s*100%;[^}]*touch-action:\s*none;/);
     expect(layout).toContain('viewportFit: "cover"');
     expect(css).toContain(".brand-guide-paper { z-index: 34;");
+    expect(css).toContain(".brand-guide-arm-right { z-index: 33; }");
     expect(css).toMatch(/\.brand-guide-window-mask\s*\{[^}]*z-index:\s*25;[^}]*object-fit:\s*fill;/);
     expect(guide).toContain('"guide-window-mask.webp"');
     expect(existsSync("public/design/2026-09-07/guide/guide-window-mask.webp")).toBe(true);
