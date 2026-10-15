@@ -1,15 +1,17 @@
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
-import { isBatchCode, isInspectionDate, latestBatchSettingKey, resolveLatestBatch, type LatestBatch } from "@/config/h5-latest-batch";
+import { isBatchCode, isInspectionDate, latestBatchSettingKey, resolveLatestBatch, splitLegacyRegularBatch, type LatestBatch } from "@/config/h5-latest-batch";
 
 export function validateLatestBatch(raw: Record<string, unknown>): LatestBatch {
-  const regularBatch = String(raw.regularBatch ?? "").trim();
+  const [regularBatch, legacySecond] = splitLegacyRegularBatch(String(raw.regularBatch ?? "").trim());
+  const regularBatchSecond = String(raw.regularBatchSecond ?? "").trim() || legacySecond || "";
   const trialBatch = String(raw.trialBatch ?? "").trim();
   const inspectionDate = String(raw.inspectionDate ?? "").trim();
-  if (!isBatchCode(regularBatch)) throw new Error("正装批次号请填写 1–24 位字母、数字或 . _ / -，并以字母或数字开头。");
-  if (!isBatchCode(trialBatch)) throw new Error("试用装批次号请填写 1–24 位字母、数字或 . _ / -，并以字母或数字开头。");
+  if (!isBatchCode(regularBatch) || regularBatch.includes("/")) throw new Error("正装批次号 1 请填写 1–24 位字母、数字或 . _ -，并以字母或数字开头。");
+  if (regularBatchSecond && (!isBatchCode(regularBatchSecond) || regularBatchSecond.includes("/"))) throw new Error("正装批次号 2 请填写 1–24 位字母、数字或 . _ -，并以字母或数字开头。");
+  if (!isBatchCode(trialBatch)) throw new Error("便携装批次号请填写 1–24 位字母、数字或 . _ / -，并以字母或数字开头。");
   if (!isInspectionDate(inspectionDate)) throw new Error("检测日期请填写有效的 YYYY-MM 或 YYYY-MM-DD，例如 2026-08 或 2026-08-15。");
-  return { regularBatch, trialBatch, inspectionDate };
+  return { regularBatch, ...(regularBatchSecond ? { regularBatchSecond } : {}), trialBatch, inspectionDate };
 }
 
 export class LatestBatchService {

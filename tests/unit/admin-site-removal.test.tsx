@@ -15,10 +15,11 @@ describe("single-page batch and report administration", () => {
   beforeEach(() => vi.clearAllMocks());
   it("places exactly the three batch fields and report uploads on the same page", async () => {
     render(await AdminPage());
-    expect(screen.getByRole("textbox", { name: "正装批次号" })).toHaveValue("GD00046087");
-    expect(screen.getByRole("textbox", { name: "试用装批次号" })).toHaveValue("GD00046086");
+    expect(screen.getByRole("textbox", { name: "正装批次号 1" })).toHaveValue("GD00046087");
+    expect(screen.getByRole("textbox", { name: "正装批次号 2（可选）" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "便携装批次号" })).toHaveValue("GD00046086");
     expect(screen.getByRole("textbox", { name: /检测日期/ })).toHaveValue("2026-08");
-    expect(screen.getAllByRole("textbox")).toHaveLength(3);
+    expect(screen.getAllByRole("textbox")).toHaveLength(4);
     expect(screen.getByRole("heading", { name: "报告图片" })).toBeInTheDocument();
   });
   it("navigates within one management page", async () => {

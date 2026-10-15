@@ -3,6 +3,7 @@ import { CategoryDetail } from "@/components/h5/CategoryDetail";
 import { preloadHomepageAssets } from "@/components/h5/homepage-preload";
 import { readCategoryScrollPosition, saveCategoryScrollPosition } from "@/components/h5/hierarchy-navigation";
 import { categoryReadinessAssets } from "@/config/h5-category-themes";
+import { previousProductionQualificationDescription, productionQualificationDescription } from "@/config/h5-production-qualification";
 import type { PublicModule } from "@/server/services/public-content-service";
 
 const navigation = vi.hoisted(() => ({
@@ -80,6 +81,29 @@ describe("CategoryDetail dynamic card copy", () => {
     render(<CategoryDetail module={moduleFixture} preview />);
     expect(screen.getByText("油脂新鲜度")).toBeInTheDocument();
     expect(screen.getByText("安全底线")).toBeInTheDocument();
+  });
+
+  it("renders the updated production qualification sentence in a single regular-weight block", () => {
+    const traceabilityWithLegacyCopy = {
+      ...traceabilityModuleFixture,
+      cards: [{ ...traceabilityModuleFixture.cards[0], id: "seed-card-traceability-qualification", description: previousProductionQualificationDescription }],
+    };
+    const { container } = render(<CategoryDetail module={traceabilityWithLegacyCopy} preview />);
+    const card = container.querySelector('.category-card-hotspot[data-index="0"]');
+    expect(card?.querySelector("small")?.textContent).toBe(productionQualificationDescription);
+    expect(card?.querySelector(".category-card-copy-emphasis")).not.toBeInTheDocument();
+    expect(card?.querySelector('[data-card-part="description"]')).not.toBeInTheDocument();
+  });
+
+  it("replaces the old raster description for an existing qualification card ID", () => {
+    const traceabilityWithExistingCard = {
+      ...traceabilityModuleFixture,
+      cards: [{ ...traceabilityModuleFixture.cards[0], id: "existing-production-card", description: previousProductionQualificationDescription }],
+    };
+    const { container } = render(<CategoryDetail module={traceabilityWithExistingCard} preview />);
+    const card = container.querySelector('.category-card-hotspot[data-index="0"]');
+    expect(card?.querySelector("small")?.textContent).toBe(productionQualificationDescription);
+    expect(card?.querySelector('[data-card-part="description"]')).not.toBeInTheDocument();
   });
 
   it("marks the archive entry on the first layout frame and announces only after artwork readiness", async () => {

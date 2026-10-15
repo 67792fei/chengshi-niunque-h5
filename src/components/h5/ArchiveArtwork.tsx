@@ -64,6 +64,9 @@ export const ArchiveArtwork = memo(function ArchiveArtwork({ preview = false, mo
   const renderLayer = (layer: ArtworkLayer) => {
     const moduleSlug = layerModule[layer.id as keyof typeof layerModule];
     const src = guideEntryBatchParts.has(layer.id) ? batchArtworkSource(layer.src, latestBatch) : layer.src;
+    const placedLayer = guideEntryBatchParts.has(layer.id) && latestBatch.regularBatchSecond
+      ? sourceLayer(designAssets.archiveBatchExpanded, layer.id)
+      : layer;
     const risingPaper = risingPaperParts.has(layer.id);
     const image = (
       <Image
@@ -71,9 +74,9 @@ export const ArchiveArtwork = memo(function ArchiveArtwork({ preview = false, mo
         className="reports-archive-source-layer"
         src={src}
         alt=""
-        width={layer.width}
-        height={layer.height}
-        style={risingPaper ? { inset: 0, width: "100%", height: "100%" } : { ...layerStyle(layer), zIndex: layerStack(layer.id) }}
+        width={placedLayer.width}
+        height={placedLayer.height}
+        style={risingPaper ? { inset: 0, width: "100%", height: "100%" } : { ...layerStyle(placedLayer), zIndex: layerStack(layer.id) }}
         sizes="(max-width: 750px) 150vw, 1125px"
         priority={Boolean(layer.eager)}
         fetchPriority={layer.eager ? "high" : "low"}

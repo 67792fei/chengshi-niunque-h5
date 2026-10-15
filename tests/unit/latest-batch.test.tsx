@@ -18,9 +18,14 @@ describe("editable latest public batch", () => {
   it("validates all fields before publishing and never accepts arbitrary homepage fields", () => {
     expect(validateLatestBatch({ ...edited, regularBatch: " GD00049001 ", archiveTitle: "changed" })).toEqual(edited);
     for (const regularBatch of ["", "A".repeat(25), "<img>", "batch with spaces"]) expect(() => validateLatestBatch({ ...edited, regularBatch })).toThrow(/正装批次号/);
-    expect(() => validateLatestBatch({ ...edited, trialBatch: "" })).toThrow(/试用装批次号/);
+    expect(() => validateLatestBatch({ ...edited, trialBatch: "" })).toThrow(/便携装批次号/);
     expect(() => validateLatestBatch({ ...edited, inspectionDate: "2026-02-30" })).toThrow(/检测日期/);
     expect(resolveLatestBatch(null)).toEqual(defaultLatestBatch);
+    const dual = { ...edited, regularBatch: "GD00046087", regularBatchSecond: "GD00046763" };
+    expect(validateLatestBatch(dual)).toEqual(dual);
+    expect(validateLatestBatch({ ...edited, regularBatch: "GD00046087/GD00046763", regularBatchSecond: "" })).toEqual(dual);
+    expect(resolveLatestBatch({ ...edited, regularBatch: "GD00046087/GD00046763" })).toEqual(dual);
+    expect(() => validateLatestBatch({ ...dual, regularBatchSecond: "bad code" })).toThrow(/正装批次号 2/);
   });
   it("reads only the approved published setting key and preserves the fixed title", () => {
     const config = publicSiteConfig({ version: "1", modules: [], settings: [{ key: "h5-site", name: "legacy", value: { archiveTitle: "legacy", ...edited } }, { key: latestBatchSettingKey, name: "batch", value: { ...edited, archiveTitle: "changed" } }] });
@@ -38,6 +43,20 @@ describe("editable latest public batch", () => {
       expect(root.querySelector('[data-batch-field="regularBatch"]')).toHaveTextContent(edited.regularBatch);
       expect(root.querySelector('[data-batch-field="trialBatch"]')).toHaveTextContent(edited.trialBatch);
       expect(root.querySelector('[data-batch-field="inspectionDate"]')).toHaveTextContent("2026年9月7日");
+    }
+  });
+  it("renders two regular codes on separate lines with the expanded artwork in live and handoff groups", () => {
+    const dual = { ...edited, regularBatch: "GD00046087", regularBatchSecond: "GD00046763" };
+    const { container } = render(<ArchiveArtwork preview latestBatch={dual}/>);
+    const handoff = createArchiveEntryTransitionVisual(undefined, dual);
+    for (const root of [container, handoff.visual]) {
+      expect(root.querySelector('[data-source-part="module-1-batch-0"]')).toHaveAttribute("src", designAssets.archiveBatchExpanded.src);
+      expect(root.querySelector('[data-batch-field="regularBatch"]')).toHaveTextContent(dual.regularBatch);
+      expect(root.querySelector('[data-batch-field="regularBatchSecond"]')).toHaveTextContent(dual.regularBatchSecond);
+      expect(root.querySelector('[data-batch-field="trialBatch"]')).toHaveTextContent(dual.trialBatch);
+      for (const key of ["regularBatch", "regularBatchSecond", "trialBatch"]) {
+        expect(root.querySelector(`[data-batch-field="${key}"]`)).toHaveAttribute("x", "330");
+      }
     }
   });
 });

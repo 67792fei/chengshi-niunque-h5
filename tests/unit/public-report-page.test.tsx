@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import ReportPage from "@/app/reports/[slug]/items/[cardId]/reports/page";
+import { previousProductionQualificationDescription, productionQualificationDescription } from "@/config/h5-production-qualification";
 
 const mocks = vi.hoisted(() => ({
   getCardSnapshot: vi.fn(),
@@ -78,6 +79,29 @@ describe("public report page", () => {
     mocks.getCardSnapshot.mockResolvedValue(snapshot);
     render(await ReportPage({ params: Promise.resolve({ slug: "review-assurance", cardId: snapshot.result.card.id }) }));
     expect(screen.getByRole("heading", { name: "非必要物质实测" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "图片检测报告 第 1 页" })).toHaveAttribute("src", imageAsset.pages[0].href);
+  });
+
+  it("shows the full qualification description above an existing production report", async () => {
+    const base = cardSnapshot([imageAsset]);
+    const snapshot = {
+      ...base,
+      result: {
+        ...base.result,
+        card: {
+          ...base.result.card,
+          id: "existing-production-card",
+          title: "生产资质",
+          description: previousProductionQualificationDescription,
+        },
+      },
+    };
+    mocks.getCardSnapshot.mockResolvedValue(snapshot);
+
+    render(await ReportPage({ params: Promise.resolve({ slug: "production-traceability", cardId: snapshot.result.card.id }) }));
+
+    expect(screen.getByRole("heading", { name: "生产资质" })).toBeInTheDocument();
+    expect(screen.getByText(productionQualificationDescription)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "图片检测报告 第 1 页" })).toHaveAttribute("src", imageAsset.pages[0].href);
   });
 });

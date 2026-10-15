@@ -1,9 +1,18 @@
 export const latestBatchSettingKey = "latest-public-batch";
-export type LatestBatch = { regularBatch: string; trialBatch: string; inspectionDate: string };
+export type LatestBatch = { regularBatch: string; regularBatchSecond?: string; trialBatch: string; inspectionDate: string };
 export const defaultLatestBatch: LatestBatch = { regularBatch: "GD00046087", trialBatch: "GD00046086", inspectionDate: "2026-08" };
 
 export function isBatchCode(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._/-]{0,23}$/.test(value);
+}
+
+export function regularBatchValues(value: LatestBatch): string[] {
+  return value.regularBatchSecond ? [value.regularBatch, value.regularBatchSecond] : [value.regularBatch];
+}
+
+export function splitLegacyRegularBatch(value: string): [string, string?] {
+  const parts = value.split("/");
+  return parts.length === 2 && parts.every(isBatchCode) ? [parts[0], parts[1]] : [value];
 }
 
 export function isInspectionDate(value: unknown): value is string {
@@ -15,8 +24,12 @@ export function isInspectionDate(value: unknown): value is string {
 
 export function resolveLatestBatch(value: unknown): LatestBatch {
   const input = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const rawRegular = isBatchCode(input.regularBatch) ? input.regularBatch : defaultLatestBatch.regularBatch;
+  const [regularBatch, legacySecond] = splitLegacyRegularBatch(rawRegular);
+  const regularBatchSecond = isBatchCode(input.regularBatchSecond) ? input.regularBatchSecond : legacySecond;
   return {
-    regularBatch: isBatchCode(input.regularBatch) ? input.regularBatch : defaultLatestBatch.regularBatch,
+    regularBatch,
+    ...(regularBatchSecond ? { regularBatchSecond } : {}),
     trialBatch: isBatchCode(input.trialBatch) ? input.trialBatch : defaultLatestBatch.trialBatch,
     inspectionDate: isInspectionDate(input.inspectionDate) ? input.inspectionDate : defaultLatestBatch.inspectionDate,
   };
@@ -28,5 +41,5 @@ export function formatInspectionDate(value: string) {
 }
 
 export function isDefaultLatestBatch(value: LatestBatch) {
-  return value.regularBatch === defaultLatestBatch.regularBatch && value.trialBatch === defaultLatestBatch.trialBatch && value.inspectionDate === defaultLatestBatch.inspectionDate;
+  return value.regularBatch === defaultLatestBatch.regularBatch && !value.regularBatchSecond && value.trialBatch === defaultLatestBatch.trialBatch && value.inspectionDate === defaultLatestBatch.inspectionDate;
 }

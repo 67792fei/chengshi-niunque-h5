@@ -711,7 +711,8 @@ describe("multi-page H5 interactions", () => {
     const landscape = render(<BrandGuide />);
     await waitFor(() => expect(landscape.container.querySelector(".brand-guide")).toHaveAttribute("data-guide-profile", "landscape"));
     expect(landscape.container.querySelector(".guide-landscape-composition")).toBeInTheDocument();
-    expect(landscape.container.querySelectorAll(".guide-landscape-character img")).toHaveLength(3);
+    expect(landscape.container.querySelectorAll(".guide-landscape-character img")).toHaveLength(4);
+    expect(landscape.container.querySelector('.guide-landscape-character img[src$="guide-arm-right.webp"]')).toBeInTheDocument();
     expect(landscape.container.querySelector(".brand-guide-portrait-scene")).not.toBeInTheDocument();
     expect(landscape.container.querySelector(".guide-compact-portrait-composition")).not.toBeInTheDocument();
   });

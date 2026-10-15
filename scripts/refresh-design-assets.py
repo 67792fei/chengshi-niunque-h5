@@ -178,10 +178,22 @@ def version_archive_one(config, manifest):
     revision = manifest["groups"]["archive-1"].get("revision")
     if not revision:
         return
-    for item in [*config["archiveBook"], *config["archiveBatch"]]:
+    for item in config["archiveBook"]:
         item["src"] = item["src"].split("?", 1)[0] + f"?v={revision}"
-    for key in ["archiveBatchEditable", "archiveFallback", "archiveFallbackEditable"]:
-        config[key] = config[key].split("?", 1)[0] + f"?v={revision}"
+    for item in config["archiveBatch"]:
+        path = item["src"].split("?", 1)[0]
+        item["src"] = f"{path}?v={hashlib.sha256(runtime_path(path).read_bytes()).hexdigest()[:10]}"
+    if "archiveBatchExpanded" in config:
+        item = config["archiveBatchExpanded"]
+        path = item["src"].split("?", 1)[0]
+        digest = hashlib.sha256(runtime_path(path).read_bytes()).hexdigest()[:10]
+        item["src"] = f"{path}?v={digest}"
+    for key in ["archiveBatchEditable", "archiveFallback", "archiveFallbackEditable", "archiveFallbackExpanded"]:
+        if key not in config:
+            continue
+        path = config[key].split("?", 1)[0]
+        version = hashlib.sha256(runtime_path(path).read_bytes()).hexdigest()[:10]
+        config[key] = f"{path}?v={version}"
 
 
 def build_archive_entry(config, manifest):
@@ -287,6 +299,135 @@ def build_editable_batch(config):
     config["archiveFallbackEditable"]="/design/2026-09-07/runtime/archive-reference-editable.webp"
 
 
+def portable_batch_label():
+    """Typeset the new visible label at the source artwork's size and color."""
+    from PIL import ImageDraw, ImageFont
+
+    font_paths = [Path("C:/Windows/Fonts/NotoSansSC-VF.ttf"),
+                  Path("/usr/share/fonts/truetype/noto/NotoSansSC-VF.ttf")]
+    font_path = next((path for path in font_paths if path.exists()), None)
+    if font_path is None:
+        raise FileNotFoundError("Noto Sans SC is required to rebuild the batch label")
+    font = ImageFont.truetype(str(font_path), 55)
+    font.set_variation_by_name("Regular")
+    artwork = Image.new("RGBA", (190, 65))
+    ImageDraw.Draw(artwork).text((4, 2), "便携装", font=font,
+                                fill=(102, 63, 29, 255), anchor="lt")
+    original = rgba(SOURCES / "2-长图模块1/长图模块一，部件/资源 12.png")
+    artwork.alpha_composite(original.crop((166, 65, 190, 130)), (166, 0))
+    return artwork
+
+
+def build_portable_batch_label(config):
+    """Replace the raster label in both layered and full-image variants."""
+    from PIL import ImageDraw
+
+    label = portable_batch_label()
+    part = config["archiveBatch"][0]
+    clear_box = (130, 2968, 325, 3033)
+    for key in ["archiveBatch", "archiveBatchEditable"]:
+        path = part["src"] if key == "archiveBatch" else config[key]
+        image = rgba(runtime_path(path))
+        sx, sy = image.width / part["width"], image.height / part["height"]
+        region = tuple(round(value * scale) for value, scale in zip(
+            (clear_box[0] - part["x"], clear_box[1] - part["y"],
+             clear_box[2] - part["x"], clear_box[3] - part["y"]),
+            (sx, sy, sx, sy)))
+        alpha = image.getchannel("A")
+        ImageDraw.Draw(alpha).rectangle(region, fill=0)
+        image.putalpha(alpha)
+        image.alpha_composite(label.resize((round(190 * sx), round(65 * sy)), Image.Resampling.LANCZOS),
+                              (round((135 - part["x"]) * sx), round((2968 - part["y"]) * sy)))
+        if key == "archiveBatch":
+            image.save(runtime_path(path), "WEBP", quality=92, method=6, exact=True)
+        else:
+            image.save(runtime_path(path), "WEBP", lossless=True, method=6, exact=True)
+
+    book = rgba(runtime_path(config["archiveBook"][0]["src"]))
+    for key in ["archiveFallback", "archiveFallbackEditable"]:
+        path = config[key]
+        fallback = rgba(runtime_path(path))
+        scale = fallback.width / config["archiveWidth"]
+        underlay = book.resize((fallback.width, round(3733 * scale)), Image.Resampling.LANCZOS)
+        box = tuple(round(value * scale) for value in clear_box)
+        fallback.paste(underlay.crop(box), box[:2])
+        fallback.alpha_composite(label.resize((round(190 * scale), round(65 * scale)), Image.Resampling.LANCZOS),
+                                 (round(135 * scale), round(2968 * scale)))
+        fallback.save(runtime_path(path), "WEBP", quality=92, method=6, exact=True)
+
+
+def build_expanded_batch(config, manifest):
+    """Leave the result card fixed while adding a second regular-batch row above it."""
+    from PIL import ImageDraw, ImageFont
+
+    part = config["archiveBatch"][0]
+    source = rgba(runtime_path(config["archiveBatchEditable"]))
+    source = source.resize((part["width"], part["height"]), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (2000, 3733))
+    canvas.alpha_composite(source, (part["x"], part["y"]))
+    # The original title, labels and digits are one raster group. The clean
+    # book beneath this transparent area supplies the existing yellow texture.
+    ImageDraw.Draw(canvas).rectangle((0, 2580, 1100, 3050), fill=(0, 0, 0, 0))
+    parts = manifest["groups"]["archive-1"]["parts"]
+
+    def source_part(number):
+        placement = parts[f"资源 {number}"]
+        image = rgba(SOURCES / placement["source"])
+        return image.resize((placement["width"], placement["height"]), Image.Resampling.LANCZOS)
+
+    # Keep the approved lettering, bullets and labels. Only their positions
+    # change; the three values and date are drawn by the shared SVG overlay.
+    for number, x, y in [(6, 59, 2528), (7, 100, 2782), (8, 711, 2782),
+                         (9, 745, 2762), (10, 135, 2762)]:
+        canvas.alpha_composite(source_part(number), (x, y))
+    batch_labels = source_part(12)
+    # The two batch labels span the same width: left edges and colons align.
+    canvas.alpha_composite(batch_labels.crop((0, 0, 55, 65)), (135, 2840))
+    canvas.alpha_composite(batch_labels.crop((55, 0, 112, 65)), (243, 2840))
+    canvas.alpha_composite(batch_labels.crop((112, 0, 135, 65)), (301, 2840))
+    canvas.alpha_composite(portable_batch_label(), (135, 2968))
+
+    # The original footer sentence is baked into the supplied full image.
+    # Restore just its paper strip from the separate blank card component,
+    # then typeset the three-batch statement without touching the result rows.
+    card_placement = parts["资源 5"]
+    card = source_part(5)
+    footer_box = (94, 3475, 1535, 3546)
+    card_x, card_y = card_placement["x"], card_placement["y"]
+    card_strip = card.crop((footer_box[0] - card_x, footer_box[1] - card_y,
+                            footer_box[2] - card_x, footer_box[3] - card_y))
+    canvas.alpha_composite(card_strip, footer_box[:2])
+    footer_copy = "以上三个批次内容物为同配方、同批原料、同一产线生产，共用同一份内容物检测报告。"
+    font_paths = [Path("C:/Windows/Fonts/NotoSansSC-VF.ttf"),
+                  Path("/usr/share/fonts/truetype/noto/NotoSansSC-VF.ttf")]
+    font_path = next((path for path in font_paths if path.exists()), None)
+    if font_path is None:
+        raise FileNotFoundError("Noto Sans SC is required to rebuild the expanded batch footer")
+    font = ImageFont.truetype(str(font_path), 37)
+    font.set_variation_by_name("Regular")
+    ImageDraw.Draw(canvas).text((105, 3488), footer_copy, font=font,
+                                fill=(105, 78, 53, 255), anchor="lt")
+
+    box = (0, 2530, part["x"] + part["width"], part["y"] + part["height"])
+    expanded = canvas.crop(box)
+    expanded.resize((1000, round(expanded.height * 1000 / expanded.width)), Image.Resampling.LANCZOS).save(
+        OUTPUT / "runtime/archive-batch-expanded.webp", "WEBP", lossless=True, method=6, exact=True)
+    config["archiveBatchExpanded"] = {
+        "src": "/design/2026-09-07/runtime/archive-batch-expanded.webp",
+        "x": box[0], "y": box[1], "width": box[2] - box[0], "height": box[3] - box[1],
+    }
+
+    fallback = rgba(runtime_path(config["archiveFallbackEditable"]))
+    book = rgba(runtime_path(config["archiveBook"][0]["src"]))
+    scale = fallback.width / config["archiveWidth"]
+    clear_box = (0, round(2530 * scale), round(1100 * scale), round(3050 * scale))
+    fallback.paste(book.crop(clear_box), clear_box[:2])
+    scaled = expanded.resize((round(expanded.width * scale), round(expanded.height * scale)), Image.Resampling.LANCZOS)
+    fallback.alpha_composite(scaled, (0, round(box[1] * scale)))
+    fallback.save(OUTPUT / "runtime/archive-reference-expanded.webp", "WEBP", quality=92, method=6, exact=True)
+    config["archiveFallbackExpanded"] = "/design/2026-09-07/runtime/archive-reference-expanded.webp"
+
+
 def build_archive_module_one(config, manifest):
     """Replace module one only; retain the later fallback artwork and layout."""
     previous_editable = rgba(runtime_path(config["archiveFallbackEditable"]))
@@ -298,6 +439,8 @@ def build_archive_module_one(config, manifest):
     fallback.paste(first_module, (0, 0))
     fallback.save(runtime_path(config["archiveFallback"]), "WEBP", quality=92, method=6, exact=True)
     build_editable_batch(config)
+    build_portable_batch_label(config)
+    build_expanded_batch(config, manifest)
     editable = rgba(runtime_path(config["archiveFallbackEditable"]))
     editable.paste(previous_editable.crop((0, height, editable.width, editable.height)), (0, height))
     editable.save(runtime_path(config["archiveFallbackEditable"]), "WEBP", quality=92, method=6, exact=True)
@@ -335,6 +478,56 @@ def build_category_tails(config, manifest):
         filename=f"{name}-page-tail.webp"
         tail.save(OUTPUT/"runtime"/filename,"WEBP",quality=92,method=6,exact=True)
         config["categories"][slug]["tail"]=f"/design/2026-09-07/runtime/{filename}"
+
+
+def build_guide_composition(manifest):
+    """Align the reusable guide paper and arm to the supplied 9.4 still."""
+    guide_parts=manifest["groups"]["guide"]["parts"]
+    def guide_item(n): return guide_parts[f"资源 {n}" if isinstance(n,int) else n]
+    oldguide=ROOT/"public/design/guide"
+    guide_out=OUTPUT/"guide";guide_out.mkdir(exist_ok=True)
+    guide_names=["guide-background","guide-character-open","guide-character-closed","guide-window-mask","guide-arch","report-paper-top","report-paper-left","report-paper-bottom"]
+    for name in guide_names: shutil.copyfile(oldguide/f"{name}.webp",guide_out/f"{name}.webp")
+
+    # The older right-hand paper is 90px too far inward and 57px too low on
+    # the 750x1625 canvas. These offsets register it to the approved 9.4 still.
+    right_paper=Image.new("RGBA",(750,1625))
+    right_paper.paste(rgba(oldguide/"report-paper-right.webp"),(90,-57))
+    right_paper.save(guide_out/"report-paper-right.webp","WEBP",lossless=True,method=6)
+
+    # Resource 9 is the original right arm. It belongs below the paper rather
+    # than in the upper foreground with the hat and label.
+    right_arm=Image.new("RGBA",(750,1625))
+    arm_source=rgba(SOURCES/guide_item(9)["source"])
+    right_arm.alpha_composite(arm_source.resize((round(arm_source.width*.375),round(arm_source.height*.375)),Image.Resampling.LANCZOS),(628,381))
+    right_arm.save(guide_out/"guide-arm-right.webp","WEBP",lossless=True,method=6)
+
+    old_foreground=np.asarray(rgba(oldguide/"guide-foreground-top.webp")).copy()
+    x=np.arange(750)[None,:]
+    dark=(old_foreground[:,:,:3]<150).all(axis=2)
+
+    fg=Image.new("RGBA",(750,1625))
+    def guide_place(im,x,y):fg.alpha_composite(im.resize((round(im.width*.375),round(im.height*.375)),Image.Resampling.LANCZOS),(x,y))
+    guide_place(rgba(SOURCES/guide_item("检测报告")["source"]),-49,508)
+    guide_place(rgba(SOURCES/guide_item(6)["source"]),136,116)
+    # Keep the hat and DHA over the moving paper; the right arm stays behind it.
+    arr=old_foreground.copy();keep=np.zeros(arr.shape[:2],dtype=bool)
+    keep[420:700,80:700]=True
+    yellow=(arr[:,:,0]>210)&(arr[:,:,1]>100)&(arr[:,:,1]<235)&(arr[:,:,2]<175)&(arr[:,:,0].astype(int)-arr[:,:,1].astype(int)>20)
+    keep &= (dark&(x<610))|yellow
+    arr[:,:,3]=np.where(keep,arr[:,:,3],0);fg.alpha_composite(Image.fromarray(arr))
+    for n,px,py in [(10,53,838),(11,229,947)]:guide_place(rgba(SOURCES/guide_item(n)["source"]),px,py)
+    fg.save(guide_out/"guide-foreground-top.webp","WEBP",lossless=True,method=6)
+    hint=rgba(SOURCES/guide_item("添加上下跳动的动效")["source"])
+    hint.save(guide_out/"swipe-up-hint-v2.png")
+    for mode in ["first-frame","static-foreground-v2"]:
+        canvas=rgba(guide_out/"guide-background.webp")
+        names=["guide-character-open","guide-window-mask","guide-arch","guide-arm-right"]
+        if mode=="static-foreground-v2":names += [f"report-paper-{side}" for side in ["top","left","right","bottom"]]
+        for name in names:canvas.alpha_composite(rgba(guide_out/f"{name}.webp"))
+        canvas.alpha_composite(fg)
+        if mode=="static-foreground-v2":canvas.alpha_composite(hint.resize((326,98),Image.Resampling.LANCZOS),(212,1473))
+        canvas.save(guide_out/f"guide-{mode}.webp","WEBP",quality=94,method=6)
 
 
 def build():
@@ -422,35 +615,7 @@ def build():
         fish_clean.paste(clean3.crop(box),box[:2])
     config["fishPatch"]=cut_layer(fish_clean,(0,40,2000,270),"fish-clean",7974)
 
-    # New KV shares the exact pixels of the existing mascot, mask, logo and
-    # paper primitive. Retain their established poses and replace the envelope
-    # with the newly supplied report artwork on the same 750x1625 plane.
-    oldguide=ROOT/"public/design/guide"
-    guide_out=OUTPUT/"guide";guide_out.mkdir(exist_ok=True)
-    guide_names=["guide-background","guide-character-open","guide-character-closed","guide-window-mask","guide-arch","report-paper-top","report-paper-left","report-paper-right","report-paper-bottom"]
-    for name in guide_names: shutil.copyfile(oldguide/f"{name}.webp",guide_out/f"{name}.webp")
-    fg=Image.new("RGBA",(750,1625))
-    def guide_place(im,x,y):fg.alpha_composite(im.resize((round(im.width*.375),round(im.height*.375)),Image.Resampling.LANCZOS),(x,y))
-    guide_place(rgba(SOURCES/item("guide","检测报告")["source"]),-49,508)
-    guide_place(rgba(SOURCES/item("guide",6)["source"]),136,116)
-    # Hat and DHA must stay above the animated right paper.
-    promoted=rgba(oldguide/"guide-foreground-top.webp")
-    arr=np.asarray(promoted).copy(); keep=np.zeros(arr.shape[:2],dtype=bool)
-    keep[420:700,80:700]=True
-    keep &= ((arr[:,:,0]<125)&(arr[:,:,1]<125)&(arr[:,:,2]<125)) | ((arr[:,:,0]>210)&(arr[:,:,1]>100)&(arr[:,:,1]<235)&(arr[:,:,2]<175)&(arr[:,:,0].astype(int)-arr[:,:,1].astype(int)>20))
-    arr[:,:,3]=np.where(keep,arr[:,:,3],0);fg.alpha_composite(Image.fromarray(arr))
-    for n,x,y in [(9,628,381),(10,53,838),(11,229,947)]:guide_place(rgba(SOURCES/item("guide",n)["source"]),x,y)
-    fg.save(guide_out/"guide-foreground-top.webp","WEBP",lossless=True,method=6)
-    hint=rgba(SOURCES/item("guide","添加上下跳动的动效")["source"])
-    hint.save(guide_out/"swipe-up-hint-v2.png")
-    for mode in ["first-frame","static-foreground-v2"]:
-        canvas=rgba(guide_out/"guide-background.webp")
-        names=["guide-character-open","guide-window-mask","guide-arch"]
-        if mode=="static-foreground-v2":names += [f"report-paper-{side}" for side in ["top","left","right","bottom"]]
-        for name in names:canvas.alpha_composite(rgba(guide_out/f"{name}.webp"))
-        canvas.alpha_composite(fg)
-        if mode=="static-foreground-v2":canvas.alpha_composite(hint.resize((326,98),Image.Resampling.LANCZOS),(212,1473))
-        canvas.save(guide_out/f"guide-{mode}.webp","WEBP",quality=94,method=6)
+    build_guide_composition(manifest)
     save(ref("loading"),"loading-poster",750)
     build_loading_motion(config)
 
@@ -504,6 +669,8 @@ def build():
     for im,y in [(a1,0),(full,3733),(a3,7974)]:complete.alpha_composite(im,(0,y))
     config["archiveFallback"]=save(complete,"archive-reference",1000)
     build_editable_batch(config)
+    build_portable_batch_label(config)
+    build_expanded_batch(config,manifest)
     module2_specs=[(3,"heading",None),(28,"inspection-paper",None),(26,"inspection-folder","inspection-projects"),(29,"inspection-mascot",None),(25,"review-folder","review-assurance"),(27,"production-paper",None),(24,"production-folder","production-traceability"),(23,"instructions",None)]
     config["archiveModule2"]=[{"id":f"module-2-{name}","slug":slug,**save_part("archive-2",n,offset=3733)} for n,name,slug in module2_specs]
     # Hit regions follow the visible original alpha contours, including the
@@ -543,10 +710,14 @@ if __name__ == "__main__":
     parser.add_argument("--review-card-copy", action="store_true")
     parser.add_argument("--category-tails", action="store_true")
     parser.add_argument("--editable-batch", action="store_true")
+    parser.add_argument("--expanded-batch", action="store_true")
+    parser.add_argument("--guide-composition", action="store_true")
     parser.add_argument("--loading-motion", action="store_true")
     args = parser.parse_args()
     if args.build: build()
-    elif args.fish_motion or args.archive_entry or args.archive_module_one or args.review_card_copy or args.category_tails or args.editable_batch or args.loading_motion:
+    elif args.guide_composition:
+        build_guide_composition(json.loads((OUTPUT/"manifest.json").read_text(encoding="utf-8")))
+    elif args.fish_motion or args.archive_entry or args.archive_module_one or args.review_card_copy or args.category_tails or args.editable_batch or args.expanded_batch or args.loading_motion:
         target=ROOT/"src/config/design-assets.generated.ts"
         prefix="// Generated by scripts/refresh-design-assets.py --build. Do not hand edit.\nexport const designAssets = "
         config=json.loads(target.read_text(encoding="utf-8").split("export const designAssets = ",1)[1].removesuffix(" as const;\n"))
@@ -554,8 +725,13 @@ if __name__ == "__main__":
         if args.fish_motion: build_fish_motion(config)
         elif args.review_card_copy: build_review_card_copy(config,manifest)
         elif args.archive_module_one: build_archive_module_one(config,manifest)
-        elif args.archive_entry: build_archive_entry(config,json.loads((OUTPUT/"manifest.json").read_text(encoding="utf-8")))
-        elif args.editable_batch: build_editable_batch(config)
+        elif args.archive_entry:
+            build_archive_entry(config, manifest)
+            build_editable_batch(config)
+            build_portable_batch_label(config)
+            build_expanded_batch(config, manifest)
+        elif args.editable_batch: build_editable_batch(config); build_portable_batch_label(config); build_expanded_batch(config, manifest)
+        elif args.expanded_batch: build_portable_batch_label(config); build_expanded_batch(config, manifest)
         elif args.loading_motion: build_loading_motion(config)
         else: build_category_tails(config,json.loads((OUTPUT/"manifest.json").read_text(encoding="utf-8")))
         version_archive_one(config,manifest)

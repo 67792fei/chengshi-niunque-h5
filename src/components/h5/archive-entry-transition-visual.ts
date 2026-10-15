@@ -176,7 +176,10 @@ export function createArchiveEntryTransitionVisual(createImage: TransitionImageF
   const batch = document.createElement("div");
   batch.className = "h5-guide-archive-entry-group is-batch";
   batch.dataset.guideDestinationGroup = "latest-batch";
-  for (const item of archiveEntryBatchLayers) batch.append(createLayerImage({ ...item, src: batchArtworkSource(item.src, latestBatch) }, createImage));
+  for (const item of archiveEntryBatchLayers) {
+    const placed = latestBatch.regularBatchSecond ? layer(designAssets.archiveBatchExpanded, item.id, item.stack) : item;
+    batch.append(createLayerImage({ ...placed, src: batchArtworkSource(item.src, latestBatch) }, createImage));
+  }
   const details = createBatchDetails(latestBatch);
   if (details) batch.append(details);
 

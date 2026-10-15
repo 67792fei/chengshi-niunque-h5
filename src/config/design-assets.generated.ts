@@ -161,7 +161,7 @@ export const designAssets = {
   ],
   "archiveBatch": [
     {
-      "src": "/design/2026-09-07/runtime/archive-1-batch-module.webp?v=20260908",
+      "src": "/design/2026-09-07/runtime/archive-1-batch-module.webp?v=86ca73fcc1",
       "x": 0,
       "y": 2594,
       "width": 1631,
@@ -867,7 +867,7 @@ export const designAssets = {
       "tail": "/design/2026-09-07/runtime/traceability-page-tail.webp"
     }
   },
-  "archiveFallback": "/design/2026-09-07/runtime/archive-reference.webp?v=20260908",
+  "archiveFallback": "/design/2026-09-07/runtime/archive-reference.webp?v=b319d50912",
   "archiveModule2": [
     {
       "id": "module-2-heading",
@@ -9214,8 +9214,8 @@ export const designAssets = {
     "width": 2000,
     "height": 2809
   },
-  "archiveBatchEditable": "/design/2026-09-07/runtime/archive-batch-editable.webp?v=20260908",
-  "archiveFallbackEditable": "/design/2026-09-07/runtime/archive-reference-editable.webp?v=20260908",
+  "archiveBatchEditable": "/design/2026-09-07/runtime/archive-batch-editable.webp?v=2def1104b2",
+  "archiveFallbackEditable": "/design/2026-09-07/runtime/archive-reference-editable.webp?v=88ac5c2531",
   "loadingMotion": {
     "width": 2000,
     "height": 4333,
@@ -9235,5 +9235,13 @@ export const designAssets = {
     },
     "initialFill": 418,
     "travel": 896
-  }
+  },
+  "archiveBatchExpanded": {
+    "src": "/design/2026-09-07/runtime/archive-batch-expanded.webp?v=0373ff51c7",
+    "x": 0,
+    "y": 2530,
+    "width": 1631,
+    "height": 1072
+  },
+  "archiveFallbackExpanded": "/design/2026-09-07/runtime/archive-reference-expanded.webp?v=77489e8632"
 } as const;

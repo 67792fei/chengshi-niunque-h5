@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { AdaptiveReadinessGate, useAdaptiveReadiness, useAdaptiveReadinessFailed } from "@/components/h5/AdaptiveReadinessGate";
 import { getCategoryTheme, placeholderCardId } from "@/config/h5-category-themes";
 import { resolveCategoryCardCopy } from "@/config/h5-card-copy";
+import { productionQualificationDescription } from "@/config/h5-production-qualification";
 import { SwipeBackPage } from "@/components/h5/SwipeBackPage";
 import { RuntimeLoadingBuffer } from "@/components/h5/RuntimeLoadingBuffer";
 import { useVisualViewportHeight } from "@/components/h5/useVisualViewportHeight";
@@ -150,7 +151,10 @@ function CategoryDetailReady({ module, preview = false }: CategoryDetailProps) {
         const { title, description, buttonText } = resolveCategoryCardCopy(module.slug, card, index);
         const label = `${title}，${buttonText}`;
         const useTitleArtwork = title === fallback.title;
-        const useDescriptionArtwork = description === fallback.description;
+        const isProductionQualification = module.slug === "production-traceability"
+          && title === "生产资质" && (card?.id === "seed-card-traceability-qualification" || index === 0);
+        const hasExpandedQualificationCopy = isProductionQualification && description === productionQualificationDescription;
+        const useDescriptionArtwork = description === fallback.description && !isProductionQualification;
         const partImage = (part: typeof fallback.titleArtwork, role: string) => <Image key={`${role}-${part.src}`} className="category-card-source-part" data-card-part={role} src={part.src} alt="" width={part.width} height={part.height} unoptimized style={{ left: `${(part.x / 2 - layout.x) / layout.width * 100}%`, top: `${(part.y / 2 - layout.y) / layout.height * 100}%`, width: `${part.width / 2 / layout.width * 100}%`, height: `${part.height / 2 / layout.height * 100}%` }} />;
         const copy = <>
           <span className="category-card-source-art" aria-hidden="true">
@@ -173,8 +177,8 @@ function CategoryDetailReady({ module, preview = false }: CategoryDetailProps) {
           "--category-copy-y": layout.contentY,
           "--category-copy-width": layout.contentWidth,
         } as CSSProperties;
-        return preview ? <article key={cardId} className="category-card-hotspot" data-index={index} style={style}>{copy}</article> :
-          <button key={cardId} type="button" className="category-card-hotspot" data-index={index} style={style} data-card-id={cardId} data-placeholder={!card || undefined} aria-label={label} disabled={leaving} onClick={() => {
+        return preview ? <article key={cardId} className="category-card-hotspot" data-index={index} data-expanded-qualification={hasExpandedQualificationCopy || undefined} style={style}>{copy}</article> :
+          <button key={cardId} type="button" className="category-card-hotspot" data-index={index} data-expanded-qualification={hasExpandedQualificationCopy || undefined} style={style} data-card-id={cardId} data-placeholder={!card || undefined} aria-label={label} disabled={leaving} onClick={() => {
             if (leaving) return;
             setLeaving(true);
             const destination = `/reports/${module.slug}/items/${cardId}/reports` as const;
